@@ -30,6 +30,7 @@ conteo_cam*.csv
 *.onnx
 *.engine
 *.tflite
+*.pt
 
 # YOLOv8 / Ultralytics cache
 runs/

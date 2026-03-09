@@ -124,6 +124,98 @@
         </button>
       </div>
 
+      <!-- Configuración del modo de detección -->
+      <div class="config-section">
+        <h3 class="chart-title">Modo de detección</h3>
+
+        <div class="mode-selector" id="modeSelector">
+          <button class="mode-btn active" data-mode="line">Por línea</button>
+          <button class="mode-btn" data-mode="roi">Por área</button>
+          <button class="mode-btn" data-mode="fov">Campo de visión</button>
+        </div>
+
+        <!-- Parámetros: modo línea -->
+        <div class="mode-params" id="paramsLine">
+          <div class="param-row">
+            <label class="param-check-label">
+              <input type="checkbox" id="useHorizontal" checked />
+              Línea horizontal activa
+            </label>
+          </div>
+          <div class="param-row" id="rowHpos">
+            <div class="param-label-row">
+              <span class="param-label">Posición horizontal</span>
+              <span class="param-value" id="valHpos">50%</span>
+            </div>
+            <input type="range" id="sliderHpos" min="5" max="95" value="50" class="param-slider" />
+          </div>
+          <div class="param-row">
+            <label class="param-check-label">
+              <input type="checkbox" id="useVertical" />
+              Línea vertical activa
+            </label>
+          </div>
+          <div class="param-row" id="rowVpos">
+            <div class="param-label-row">
+              <span class="param-label">Posición vertical</span>
+              <span class="param-value" id="valVpos">50%</span>
+            </div>
+            <input type="range" id="sliderVpos" min="5" max="95" value="50" class="param-slider" />
+          </div>
+        </div>
+
+        <!-- Parámetros: modo área (ROI) -->
+        <div class="mode-params hidden" id="paramsRoi">
+          <div class="param-row">
+            <div class="param-label-row">
+              <span class="param-label">Borde izquierdo (X1)</span>
+              <span class="param-value" id="valRoiX1">0%</span>
+            </div>
+            <input type="range" id="sliderRoiX1" min="0" max="90" value="0" class="param-slider" />
+          </div>
+          <div class="param-row">
+            <div class="param-label-row">
+              <span class="param-label">Borde superior (Y1)</span>
+              <span class="param-value" id="valRoiY1">0%</span>
+            </div>
+            <input type="range" id="sliderRoiY1" min="0" max="90" value="0" class="param-slider" />
+          </div>
+          <div class="param-row">
+            <div class="param-label-row">
+              <span class="param-label">Borde derecho (X2)</span>
+              <span class="param-value" id="valRoiX2">100%</span>
+            </div>
+            <input type="range" id="sliderRoiX2" min="10" max="100" value="100" class="param-slider" />
+          </div>
+          <div class="param-row">
+            <div class="param-label-row">
+              <span class="param-label">Borde inferior (Y2)</span>
+              <span class="param-value" id="valRoiY2">100%</span>
+            </div>
+            <input type="range" id="sliderRoiY2" min="10" max="100" value="100" class="param-slider" />
+          </div>
+        </div>
+
+        <!-- Parámetros: modo campo de visión -->
+        <div class="mode-params hidden" id="paramsFov">
+          <p class="param-info">
+            Acumula cada persona única detectada al menos una vez en cuadro.<br/>
+            No requiere configurar líneas ni áreas.
+          </p>
+        </div>
+
+        <!-- Confianza (común a todos los modos) -->
+        <div class="param-row param-shared">
+          <div class="param-label-row">
+            <span class="param-label">Confianza de detección</span>
+            <span class="param-value" id="valConfidence">30%</span>
+          </div>
+          <input type="range" id="sliderConfidence" min="10" max="90" value="30" class="param-slider" />
+        </div>
+
+        <button class="btn-apply" id="btnApplyConfig">✓ Aplicar configuración</button>
+      </div>
+
     </section>
   </main>
 

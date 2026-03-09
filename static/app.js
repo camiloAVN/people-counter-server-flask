@@ -20,14 +20,20 @@ const MODE_LABELS = {
 };
 
 // ── Estado local ────────────────────────────────────────────────────────────
-let chart       = null;
-let ws          = null;
+let chart        = null;
+let ws           = null;
 let sessionStart = null;   // hora de la primera estadística recibida
+
+// Modo activo en el panel (puede diferir del servidor hasta aplicar)
+let selectedMode = 'line';
+// Flag para evitar que el primer WS sync sobreescriba una selección activa del usuario
+let configSyncedOnce = false;
 
 // ── Inicialización ──────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   initChart();
   initEventListeners();
+  initConfigPanel();
   connectWebSocket();
   startClock();
   monitorVideoFeed();
@@ -183,6 +189,9 @@ function updateDashboard(data) {
     updateChart(data.hourly_entries);
   }
 
+  // Sincronizar panel de configuración con el estado del servidor (solo primera vez)
+  syncConfigPanel(data);
+
   // Adaptar etiquetas según el modo
   if (data.counting_mode === 'fov') {
     setLabelText('inCount',  'Personas vistas');
@@ -236,6 +245,147 @@ function monitorVideoFeed() {
 function initEventListeners() {
   document.getElementById('btnDownload')?.addEventListener('click', handleDownload);
   document.getElementById('btnReset')?.addEventListener('click', handleReset);
+}
+
+// ── Panel de configuración del modo ─────────────────────────────────────────
+function initConfigPanel() {
+  // Botones de modo
+  document.querySelectorAll('.mode-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      selectedMode = btn.dataset.mode;
+      updateModeBtnUI(selectedMode);
+      showModeParams(selectedMode);
+    });
+  });
+
+  // Sliders de línea
+  linkSlider('sliderHpos',      'valHpos',      (v) => `${v}%`);
+  linkSlider('sliderVpos',      'valVpos',      (v) => `${v}%`);
+  linkSlider('sliderRoiX1',     'valRoiX1',     (v) => `${v}%`);
+  linkSlider('sliderRoiY1',     'valRoiY1',     (v) => `${v}%`);
+  linkSlider('sliderRoiX2',     'valRoiX2',     (v) => `${v}%`);
+  linkSlider('sliderRoiY2',     'valRoiY2',     (v) => `${v}%`);
+  linkSlider('sliderConfidence','valConfidence', (v) => `${v}%`);
+
+  // Checkboxes de línea: mostrar/ocultar slider asociado cuando está deshabilitado
+  document.getElementById('useHorizontal')?.addEventListener('change', (e) => {
+    const row = document.getElementById('rowHpos');
+    if (row) row.style.opacity = e.target.checked ? '1' : '0.4';
+  });
+  document.getElementById('useVertical')?.addEventListener('change', (e) => {
+    const row = document.getElementById('rowVpos');
+    if (row) row.style.opacity = e.target.checked ? '1' : '0.4';
+  });
+
+  // Botón aplicar
+  document.getElementById('btnApplyConfig')?.addEventListener('click', handleApplyConfig);
+}
+
+function linkSlider(sliderId, valueId, format) {
+  const slider = document.getElementById(sliderId);
+  if (!slider) return;
+  slider.addEventListener('input', () => {
+    setText(valueId, format(slider.value));
+  });
+}
+
+function updateModeBtnUI(mode) {
+  document.querySelectorAll('.mode-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.mode === mode);
+  });
+}
+
+function showModeParams(mode) {
+  const panels = { line: 'paramsLine', roi: 'paramsRoi', fov: 'paramsFov' };
+  Object.entries(panels).forEach(([m, id]) => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('hidden', m !== mode);
+  });
+}
+
+function syncConfigPanel(data) {
+  // Solo sincronizar con el servidor la primera vez (evitar pisar cambios del usuario)
+  if (configSyncedOnce) return;
+  configSyncedOnce = true;
+
+  const mode = data.counting_mode ?? 'line';
+  selectedMode = mode;
+  updateModeBtnUI(mode);
+  showModeParams(mode);
+
+  // Línea horizontal
+  const useH = data.use_horizontal_line ?? true;
+  const chkH = document.getElementById('useHorizontal');
+  if (chkH) {
+    chkH.checked = useH;
+    const row = document.getElementById('rowHpos');
+    if (row) row.style.opacity = useH ? '1' : '0.4';
+  }
+  setSlider('sliderHpos', 'valHpos', Math.round((data.line_position ?? 0.5) * 100));
+
+  // Línea vertical
+  const useV = data.use_vertical_line ?? false;
+  const chkV = document.getElementById('useVertical');
+  if (chkV) {
+    chkV.checked = useV;
+    const row = document.getElementById('rowVpos');
+    if (row) row.style.opacity = useV ? '1' : '0.4';
+  }
+  setSlider('sliderVpos', 'valVpos', Math.round((data.line_position_vertical ?? 0.5) * 100));
+
+  // ROI
+  setSlider('sliderRoiX1', 'valRoiX1', Math.round((data.roi_x1 ?? 0) * 100));
+  setSlider('sliderRoiY1', 'valRoiY1', Math.round((data.roi_y1 ?? 0) * 100));
+  setSlider('sliderRoiX2', 'valRoiX2', Math.round((data.roi_x2 ?? 1) * 100));
+  setSlider('sliderRoiY2', 'valRoiY2', Math.round((data.roi_y2 ?? 1) * 100));
+
+  // Confianza
+  setSlider('sliderConfidence', 'valConfidence', Math.round((data.confidence ?? 0.3) * 100));
+}
+
+function setSlider(sliderId, valueId, intValue) {
+  const slider = document.getElementById(sliderId);
+  if (slider) slider.value = intValue;
+  setText(valueId, `${intValue}%`);
+}
+
+async function handleApplyConfig() {
+  const btn = document.getElementById('btnApplyConfig');
+  if (btn) { btn.disabled = true; btn.textContent = 'Aplicando…'; }
+
+  const payload = { counting_mode: selectedMode };
+
+  if (selectedMode === 'line') {
+    payload.use_horizontal_line = document.getElementById('useHorizontal')?.checked ?? true;
+    payload.use_vertical_line   = document.getElementById('useVertical')?.checked ?? false;
+    payload.line_position           = (parseInt(document.getElementById('sliderHpos')?.value ?? 50) / 100);
+    payload.line_position_vertical  = (parseInt(document.getElementById('sliderVpos')?.value ?? 50) / 100);
+  } else if (selectedMode === 'roi') {
+    payload.roi_x1 = parseInt(document.getElementById('sliderRoiX1')?.value ?? 0)   / 100;
+    payload.roi_y1 = parseInt(document.getElementById('sliderRoiY1')?.value ?? 0)   / 100;
+    payload.roi_x2 = parseInt(document.getElementById('sliderRoiX2')?.value ?? 100) / 100;
+    payload.roi_y2 = parseInt(document.getElementById('sliderRoiY2')?.value ?? 100) / 100;
+  }
+
+  payload.confidence = parseInt(document.getElementById('sliderConfidence')?.value ?? 30) / 100;
+
+  try {
+    const resp = await fetch('/api/config', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload),
+    });
+    if (resp.ok) {
+      if (btn) { btn.textContent = '✓ Aplicado'; }
+      setTimeout(() => {
+        if (btn) { btn.textContent = '✓ Aplicar configuración'; btn.disabled = false; }
+      }, 1500);
+    } else {
+      if (btn) { btn.textContent = '✗ Error al aplicar'; btn.disabled = false; }
+    }
+  } catch (e) {
+    if (btn) { btn.textContent = `✗ Error: ${e.message}`; btn.disabled = false; }
+  }
 }
 
 function handleDownload() {

@@ -14,7 +14,7 @@ import tempfile
 import time
 from datetime import datetime
 
-from flask import Response, after_this_request, jsonify, send_file, send_from_directory
+from flask import Response, after_this_request, jsonify, request, send_file, send_from_directory
 
 logger = logging.getLogger("ContadorPersonas")
 
@@ -81,6 +81,59 @@ def register_routes(app, counter, camera) -> None:
     # ------------------------------------------------------------------
     # Control
     # ------------------------------------------------------------------
+
+    @app.route("/api/config", methods=["POST"])
+    def update_config():
+        """Reconfigura el modo de detección y sus parámetros en tiempo real."""
+        data = request.get_json(force=True, silent=True) or {}
+
+        if "counting_mode" in data:
+            mode = data["counting_mode"]
+            if mode in ("line", "roi", "fov"):
+                counter.set_mode(mode)
+
+        if "confidence" in data:
+            try:
+                counter.update_confidence(float(data["confidence"]))
+            except (TypeError, ValueError):
+                pass
+
+        # Líneas
+        line_kwargs = {}
+        if "line_position" in data:
+            try:
+                line_kwargs["position"] = float(data["line_position"])
+            except (TypeError, ValueError):
+                pass
+        if "line_position_vertical" in data:
+            try:
+                line_kwargs["position_vertical"] = float(data["line_position_vertical"])
+            except (TypeError, ValueError):
+                pass
+        if line_kwargs:
+            counter.update_line(**line_kwargs)
+
+        h_enabled = data.get("use_horizontal_line")
+        v_enabled = data.get("use_vertical_line")
+        if h_enabled is not None or v_enabled is not None:
+            counter.set_line_enabled(
+                horizontal=bool(h_enabled) if h_enabled is not None else None,
+                vertical=bool(v_enabled) if v_enabled is not None else None,
+            )
+
+        # ROI
+        roi_keys = ("roi_x1", "roi_y1", "roi_x2", "roi_y2")
+        if all(k in data for k in roi_keys):
+            try:
+                counter.set_roi(
+                    float(data["roi_x1"]), float(data["roi_y1"]),
+                    float(data["roi_x2"]), float(data["roi_y2"]),
+                )
+            except (TypeError, ValueError):
+                pass
+
+        logger.info("Configuración actualizada vía API: %s", data)
+        return jsonify({"status": "ok"})
 
     @app.route("/api/reset", methods=["POST"])
     def reset_counters():
@@ -150,16 +203,26 @@ def build_stats(counter) -> dict:
     )
 
     return {
-        "in_count":         counter.in_count,
-        "out_count":        counter.out_count,
-        "fov_count":        counter.fov_count,
-        "persons_in_frame": counter.persons_in_frame,
-        "net_flow":         counter.in_count - counter.out_count,
-        "fps":              round(counter.fps, 1),
-        "counting_mode":    counter.counting_mode,
-        "hourly_entries":   {str(k): v for k, v in hourly.items()},
-        "peak_hour":        peak_hour,
-        "peak_count":       peak_count,
-        "hourly_average":   hourly_avg,
-        "total_today":      total_today,
+        "in_count":                counter.in_count,
+        "out_count":               counter.out_count,
+        "fov_count":               counter.fov_count,
+        "persons_in_frame":        counter.persons_in_frame,
+        "net_flow":                counter.in_count - counter.out_count,
+        "fps":                     round(counter.fps, 1),
+        "counting_mode":           counter.counting_mode,
+        "hourly_entries":          {str(k): v for k, v in hourly.items()},
+        "peak_hour":               peak_hour,
+        "peak_count":              peak_count,
+        "hourly_average":          hourly_avg,
+        "total_today":             total_today,
+        # Estado de configuración (para sincronizar el panel de control)
+        "line_position":           counter.line_position,
+        "line_position_vertical":  counter.line_position_vertical,
+        "use_horizontal_line":     counter.use_horizontal_line,
+        "use_vertical_line":       counter.use_vertical_line,
+        "roi_x1":                  counter.roi_x1,
+        "roi_y1":                  counter.roi_y1,
+        "roi_x2":                  counter.roi_x2,
+        "roi_y2":                  counter.roi_y2,
+        "confidence":              counter.confidence,
     }
