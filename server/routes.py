@@ -69,6 +69,18 @@ def register_routes(app, counter, camera) -> None:
             mimetype="multipart/x-mixed-replace; boundary=frame",
         )
 
+    @app.route("/api/snapshot")
+    def snapshot():
+        """Devuelve el frame actual de la cámara como imagen JPEG única."""
+        frame = camera.get_jpeg_frame()
+        if frame is None:
+            return Response("Sin frame disponible", status=503)
+        return Response(
+            frame,
+            mimetype="image/jpeg",
+            headers={"Cache-Control": "no-store"},
+        )
+
     # ------------------------------------------------------------------
     # Estadísticas
     # ------------------------------------------------------------------

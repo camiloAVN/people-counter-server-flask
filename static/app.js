@@ -20,9 +20,10 @@ const MODE_LABELS = {
 };
 
 // ── Estado local ────────────────────────────────────────────────────────────
-let chart        = null;
-let ws           = null;
-let sessionStart = null;   // hora de la primera estadística recibida
+let chart           = null;
+let ws              = null;
+let sessionStart    = null;   // hora de la primera estadística recibida
+let streamingEnabled = true;  // false = modo snapshot manual
 
 // Modo activo en el panel (puede diferir del servidor hasta aplicar)
 let selectedMode = 'line';
@@ -235,16 +236,58 @@ function monitorVideoFeed() {
   if (!img) return;
 
   img.addEventListener('error', () => {
+    if (!streamingEnabled) return;
     setTimeout(() => {
       img.src = `/video_feed?t=${Date.now()}`;
     }, 2000);
   });
 }
 
+// ── Control de stream / snapshot ─────────────────────────────────────────────
+function toggleStream() {
+  streamingEnabled = !streamingEnabled;
+
+  const img         = document.getElementById('videoFeed');
+  const btnToggle   = document.getElementById('btnToggleStream');
+  const btnSnapshot = document.getElementById('btnGetSnapshot');
+
+  if (!streamingEnabled) {
+    fetchSnapshot();
+    if (btnToggle) {
+      btnToggle.textContent = '▶ Activar stream';
+      btnToggle.classList.add('stream-paused');
+    }
+    if (btnSnapshot) btnSnapshot.classList.remove('hidden');
+  } else {
+    if (img) img.src = `/video_feed?t=${Date.now()}`;
+    if (btnToggle) {
+      btnToggle.textContent = '⏸ Pausar stream';
+      btnToggle.classList.remove('stream-paused');
+    }
+    if (btnSnapshot) btnSnapshot.classList.add('hidden');
+  }
+}
+
+async function fetchSnapshot() {
+  const img = document.getElementById('videoFeed');
+  const btn = document.getElementById('btnGetSnapshot');
+  if (!img) return;
+
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Obteniendo…'; }
+
+  // Cargar snapshot como URL directa (evita blob y simplifica el flujo)
+  const snapshotUrl = `/api/snapshot?t=${Date.now()}`;
+  img.onload  = () => { if (btn) { btn.disabled = false; btn.textContent = '📷 Obtener frame'; } };
+  img.onerror = () => { if (btn) { btn.disabled = false; btn.textContent = '✗ Sin frame — reintentar'; } };
+  img.src = snapshotUrl;
+}
+
 // ── Eventos de botones ───────────────────────────────────────────────────────
 function initEventListeners() {
   document.getElementById('btnDownload')?.addEventListener('click', handleDownload);
   document.getElementById('btnReset')?.addEventListener('click', handleReset);
+  document.getElementById('btnToggleStream')?.addEventListener('click', toggleStream);
+  document.getElementById('btnGetSnapshot')?.addEventListener('click', fetchSnapshot);
 }
 
 // ── Panel de configuración del modo ─────────────────────────────────────────

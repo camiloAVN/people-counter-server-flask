@@ -17,7 +17,7 @@ DEFAULT_CONFIDENCE = 0.3
 DEFAULT_INFER_SIZE = 640
 
 # Dispositivo de inferencia: 0 = CUDA GPU 0, "cpu" = solo CPU
-INFERENCE_DEVICE = 0
+INFERENCE_DEVICE = "cpu"
 
 # ---------------------------------------------------------------------------
 # Tracking

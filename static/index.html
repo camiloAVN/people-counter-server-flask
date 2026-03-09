@@ -40,7 +40,11 @@
     <section class="video-section">
       <div class="section-header">
         <h2 class="section-title">Vista en vivo</h2>
-        <span class="mode-badge" id="modeBadge">Modo: línea</span>
+        <div class="video-controls">
+          <span class="mode-badge" id="modeBadge">Modo: línea</span>
+          <button class="btn-stream-toggle" id="btnToggleStream">⏸ Pausar stream</button>
+          <button class="btn-snapshot hidden" id="btnGetSnapshot">📷 Obtener frame</button>
+        </div>
       </div>
       <div class="video-wrapper">
         <img id="videoFeed" src="/video_feed" alt="Vista de la cámara" />
